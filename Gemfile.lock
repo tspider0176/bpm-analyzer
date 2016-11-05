@@ -1,0 +1,13 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    wav-file (0.0.3)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  wav-file
+
+BUNDLED WITH
+   1.11.2
