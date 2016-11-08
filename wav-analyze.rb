@@ -3,7 +3,7 @@ require 'rubygems'
 require 'wav-file'
 
 # wavファイルopen
-f = open("Take-Her-Heart.wav")
+f = open("mudai.wav")
 format = WavFile::readFormat(f)
 data_chunk = WavFile::readDataChunk(f)
 f.close
@@ -44,8 +44,44 @@ puts frame_max
 # 対象の各フレーム内の音量をリストで取得
 # 512個の要素を含む配列の配列に変形して、最後の配列を除くそれぞれの配列について二条平均平方根を求める
 # これで0フレームからframe_maxフレームまでの音量が取得できた
-dbs = wavs[0..sample_max].each_slice(FRAME_LEN).to_a.map{|arr| Math.sqrt(arr.inject(0){|m, x| m + x * x} / arr.size)}
-puts dbs.size
+dbs = wavs[0..sample_max].each_slice(FRAME_LEN).to_a.map{|arr| Math.sqrt(arr.inject(0){|sum, x| sum + x * x} / arr.size)}
+
 # 0番目と1番目の音量の差、2番目と3番目の音量の差、...と言った形で音量の差の配列を作成する
 # 音量の減少は考慮に入れない為、マイナス値は0とする
 diff_list = dbs.each_slice(2).to_a.map{|arr| arr[0] - arr[1] >= 0 ? arr[0] - arr[1] : 0}
+
+def calc_bpm_match(data, bpm)
+    n = data.size
+    f_bpm   = bpm / 60.0
+    s = 44100.0 / FRAME_LEN
+
+    # 畳み込みして1/N倍
+    n = 0
+    a_bpm = data.inject(0){|sum, x|
+      n = n + 1
+      sum + x * Math.cos(2 * Math::PI * f_bpm * n / s)
+    } / data.size
+
+    n = 0
+    b_bpm = data.inject(0){|sum, x|
+      n = n + 1
+      sum + x * Math.sin(2 * Math::PI * f_bpm * n / s)
+    } / data.size
+
+    Math.sqrt(a_bpm * a_bpm + b_bpm * b_bpm)
+end
+
+# 60から240までbpmのマッチ度を計算し、マッチ度のリストを返す
+def calc_match(data)
+    (60..240).map{|bpm|
+      calc_bpm_match(data, bpm)
+    }
+end
+
+res = calc_match(diff_list)
+puts "----- マッチ度数の配列 -----"
+res.each_with_index{|e, i| puts "#{i} #{e}"}
+puts "----- マッチ度最大の数 -----"
+puts res.max
+puts "----- マッチ度最大値のindex + 60 -----"
+puts res.index(res.max) + 60
