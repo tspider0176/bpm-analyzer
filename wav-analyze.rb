@@ -3,7 +3,7 @@ require 'rubygems'
 require 'wav-file'
 
 # wavファイルopen
-f = open("mudai.wav")
+f = open("jump.wav")
 format = WavFile::readFormat(f)
 data_chunk = WavFile::readDataChunk(f)
 f.close
@@ -35,16 +35,19 @@ sample_max =  wavs.size - wavs.size % FRAME_LEN
 puts "----- 解析対象のサイズ最大値(sample_max) -----"
 puts sample_max
 puts "----- 余り -----"
-puts data_chunk.size - sample_max
+puts wavs.size - sample_max
 
 frame_max = sample_max / FRAME_LEN
 puts "----- 解析対象のフレーム最大値(frame_max) -----"
 puts frame_max
 
 # 対象の各フレーム内の音量をリストで取得
-# 512個の要素を含む配列の配列に変形して、最後の配列を除くそれぞれの配列について二条平均平方根を求める
+# 512個の要素を含む配列の配列に変形して、最後の配列を除く(切り捨て)それぞれの配列について二条平均平方根を求める
 # これで0フレームからframe_maxフレームまでの音量が取得できた
 dbs = wavs[0..sample_max].each_slice(FRAME_LEN).to_a.map{|arr| Math.sqrt(arr.inject(0){|sum, x| sum + x * x} / arr.size)}
+
+puts "----- フレーム音量を保存した配列のサイズ -----"
+puts dbs.size
 
 # 0番目と1番目の音量の差、2番目と3番目の音量の差、...と言った形で音量の差の配列を作成する
 # 音量の減少は考慮に入れない為、マイナス値は0とする
