@@ -45,8 +45,7 @@ puts frame_max
 # 512個の要素を含む配列の配列に変形して、最後の配列を除くそれぞれの配列について二条平均平方根を求める
 # これで0フレームからframe_maxフレームまでの音量が取得できた
 dbs = wavs[0..sample_max].each_slice(FRAME_LEN).to_a.map{|arr| Math.sqrt(arr.inject(0){|m, x| m + x * x} / arr.size)}
-
-# 0番目と1番目の音量の差、2番目と3番目の音量の差、...と言った形で配列を作成する
-
-
-# amp_list   = np.array([np.sqrt(sum(x ** 2)) for x in frame_list])
+puts dbs.size
+# 0番目と1番目の音量の差、2番目と3番目の音量の差、...と言った形で音量の差の配列を作成する
+# 音量の減少は考慮に入れない為、マイナス値は0とする
+diff_list = dbs.each_slice(2).to_a.map{|arr| arr[0] - arr[1] >= 0 ? arr[0] - arr[1] : 0}
