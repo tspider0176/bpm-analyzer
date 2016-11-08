@@ -28,7 +28,7 @@ p wavs.size
 
 # wavファイルを一定時間(以下フレーム)ごとに区切る。
 # ここでは1フレームのサンプル数は512とする
-FRAME_LEN = 512
+FRAME_LEN = 1024
 
 # 剰余で余った部分は切り捨て
 sample_max =  wavs.size - wavs.size % FRAME_LEN
@@ -51,7 +51,13 @@ puts dbs.size
 
 # 0番目と1番目の音量の差、2番目と3番目の音量の差、...と言った形で音量の差の配列を作成する
 # 音量の減少は考慮に入れない為、マイナス値は0とする
-diff_list = dbs.each_slice(2).to_a.map{|arr| arr[0] - arr[1] >= 0 ? arr[0] - arr[1] : 0}
+# TODO sliceで最後に一個だけのデータができるときがあるのでto_aした後に[0..-2]する必要がある、原因究明
+diff_list = dbs.each_slice(2).to_a[0..-2].map{|arr|
+  puts "---"
+  puts arr[0]
+  puts arr[1]
+  arr[0] - arr[1] >= 0 ? arr[0] - arr[1] : 0
+}
 
 def calc_bpm_match(data, bpm)
     n = data.size
