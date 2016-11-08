@@ -65,6 +65,7 @@ def calc_bpm_match(data, bpm)
     s = 44100.0 / FRAME_LEN
 
     # 畳み込みして1/N倍
+    # TODO 汚いのでリファクタリング、畳み込みのみで再現できないか
     n = 0
     a_bpm = data.inject(0){|sum, x|
       n = n + 1
@@ -87,6 +88,7 @@ def calc_match(data)
     }
 end
 
+# TODO 別のマッチ方法の提案
 res = calc_match(diff_list)
 puts "----- マッチ度数の配列 -----"
 res.each_with_index{|e, i| puts "#{i} #{e}"}
