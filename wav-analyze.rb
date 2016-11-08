@@ -23,7 +23,7 @@ elsif format.bitPerSample == 8 then # signed char
 end
 wavs = data_chunk.data.unpack(bit)
 
-puts "----- 対象の波形配列の大きさ -----"
+puts "----- 解析対象の波形配列の大きさ -----"
 p wavs.size
 
 # wavファイルを一定時間(以下フレーム)ごとに区切る。
@@ -31,15 +31,22 @@ p wavs.size
 FRAME_LEN = 512
 
 # 剰余で余った部分は切り捨て
-sample_max =  data_chunk.size - data_chunk.size % FRAME_LEN
-puts "----- 解析対象のサイズ最大値 -----"
+sample_max =  wavs.size - wavs.size % FRAME_LEN
+puts "----- 解析対象のサイズ最大値(sample_max) -----"
 puts sample_max
+puts "----- 余り -----"
+puts data_chunk.size - sample_max
 
 frame_max = sample_max / FRAME_LEN
-puts "----- 解析対象のフレーム最大値 -----"
+puts "----- 解析対象のフレーム最大値(frame_max) -----"
 puts frame_max
 
-# 対象の各フレーム内の音量を取得
+# 対象の各フレーム内の音量をリストで取得
+# 512個の要素を含む配列の配列に変形して、最後の配列を除くそれぞれの配列について二条平均平方根を求める
+# これで0フレームからframe_maxフレームまでの音量が取得できた
+dbs = wavs[0..sample_max].each_slice(FRAME_LEN).to_a.map{|arr| Math.sqrt(arr.inject(0){|m, x| m + x * x} / arr.size)}
+
+# 0番目と1番目の音量の差、2番目と3番目の音量の差、...と言った形で配列を作成する
 
 
 # amp_list   = np.array([np.sqrt(sum(x ** 2)) for x in frame_list])
