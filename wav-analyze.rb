@@ -26,8 +26,7 @@ wavs = data_chunk.data.unpack(bit)
 puts "----- 解析対象の波形配列の大きさ -----"
 p wavs.size
 
-# wavファイルを一定時間(以下フレーム)ごとに区切る。
-# ここでは1フレームのサンプル数は512とする
+# フレームの長さ(フレーム内のサンプル数)は1024とする
 FRAME_LEN = 1024
 
 # 剰余で余った部分は切り捨て
@@ -43,21 +42,22 @@ puts frame_max
 
 # 対象の各フレーム内の音量をリストで取得
 # 512個の要素を含む配列の配列に変形して、最後の配列を除く(切り捨て)それぞれの配列について二条平均平方根を求める
-# これで0フレームからframe_maxフレームまでの音量が取得できた
-dbs = wavs[0..sample_max].each_slice(FRAME_LEN).to_a.map{|arr| Math.sqrt(arr.inject(0){|sum, x| sum + x * x} / arr.size)}
-
-puts "----- フレーム音量を保存した配列のサイズ -----"
-puts dbs.size
-
-# 0番目と1番目の音量の差、2番目と3番目の音量の差、...と言った形で音量の差の配列を作成する
+# これで0フレームからframe_maxフレームまでの音量が取得できる
+# 次に0番目と1番目の音量の差、2番目と3番目の音量の差、...と言った形で音量の差の配列を作成する
 # 音量の減少は考慮に入れない為、マイナス値は0とする
 # TODO sliceで最後に一個だけのデータができるときがあるのでto_aした後に[0..-2]する必要がある、原因究明
-diff_list = dbs.each_slice(2).to_a[0..-2].map{|arr|
-  puts "---"
-  puts arr[0]
-  puts arr[1]
-  arr[0] - arr[1] >= 0 ? arr[0] - arr[1] : 0
-}
+diff_arr = wavs[0..sample_max]
+  .each_slice(FRAME_LEN) # wavファイルをFRAME_LENの集合に分解
+  .to_a # Enumerable -> Array
+  .map{|arr| Math.sqrt(arr.inject(0){|sum, x| sum + x * x} / arr.size)} # それぞれのフレームについて、二乗平均平方根を計算
+  .each_slice(2) # フレームのペアを作成
+  .to_a[0..-2]
+  .map{|arr|
+    puts "---"
+    puts arr[0]
+    puts arr[1]
+    arr[0] - arr[1] >= 0 ? arr[0] - arr[1] : 0
+  }
 
 def calc_bpm_match(data, bpm)
     n = data.size
@@ -89,7 +89,7 @@ def calc_match(data)
 end
 
 # TODO 別のマッチ方法の提案
-res = calc_match(diff_list)
+res = calc_match(diff_arr)
 puts "----- マッチ度数の配列 -----"
 res.each_with_index{|e, i| puts "#{i} #{e}"}
 puts "----- マッチ度最大の数 -----"
