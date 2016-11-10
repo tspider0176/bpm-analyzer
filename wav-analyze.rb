@@ -45,13 +45,12 @@ puts frame_max
 # これで0フレームからframe_maxフレームまでの音量が取得できる
 # 次に0番目と1番目の音量の差、2番目と3番目の音量の差、...と言った形で音量の差の配列を作成する
 # 音量の減少は考慮に入れない為、マイナス値は0とする
-# TODO sliceで最後に一個だけのデータができるときがあるのでto_aした後に[0..-2]する必要がある、原因究明
 diff_arr = wavs[0..sample_max]
   .each_slice(FRAME_LEN) # wavファイルをFRAME_LENの集合に分解
   .to_a # Enumerable -> Array
   .map{|arr| Math.sqrt(arr.inject(0){|sum, x| sum + x * x} / arr.size)} # それぞれのフレームについて、二乗平均平方根を計算
   .each_slice(2) # フレームのペアを作成
-  .to_a[0..-2]
+  .to_a
   .map{|arr|
     puts "---"
     puts arr[0]
