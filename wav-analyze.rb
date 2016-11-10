@@ -50,12 +50,9 @@ diff_arr = wavs[0..sample_max]
   .to_a # Enumerable -> Array
   .map{|arr| Math.sqrt(arr.inject(0){|sum, x| sum + x * x} / arr.size)} # それぞれのフレームについて、二乗平均平方根を計算
   .each_slice(2) # フレームのペアを作成
-  .to_a
+  .to_a # Enumerable -> Array
   .map{|arr|
-    puts "---"
-    puts arr[0]
-    puts arr[1]
-    arr[0] - arr[1] >= 0 ? arr[0] - arr[1] : 0
+    arr[0] - arr[1] >= 0 ? arr[0] - arr[1] : 0 # 隣り合うフレーム同士の差を計算、ただしマイナス値は0とする
   }
 
 def calc_bpm_match(data, bpm)
@@ -89,9 +86,8 @@ end
 
 # TODO 別のマッチ方法の提案
 res = calc_match(diff_arr)
-puts "----- マッチ度数の配列 -----"
-res.each_with_index{|e, i| puts "#{i} #{e}"}
-puts "----- マッチ度最大の数 -----"
-puts res.max
+puts "----- マッチ度 -----"
+puts "BPM \t\t Match rate"
+res.each_with_index{|e, i| puts "#{i+60} \t #{e}"}
 puts "----- マッチ度最大値のindex + 60 -----"
 puts res.index(res.max) + 60
