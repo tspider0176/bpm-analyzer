@@ -3,14 +3,16 @@ require 'rubygems'
 require 'wav-file'
 
 # wavファイルopen
-f = open("jump.wav")
+f = open("mudai.wav")
 format = WavFile::readFormat(f)
 data_chunk = WavFile::readDataChunk(f)
 f.close
 
 # 入力したwavファイルのformat出力
+=begin
 puts "----- wavファイルのフォーマット -----"
 puts format
+=end
 
 # サンプリング周期[s]
 t = 1.0/format.hz
@@ -23,22 +25,14 @@ elsif format.bitPerSample == 8 then # signed char
 end
 wavs = data_chunk.data.unpack(bit)
 
-puts "----- 解析対象の波形配列の大きさ -----"
-p wavs.size
-
 # フレームの長さ(フレーム内のサンプル数)は1024とする
 FRAME_LEN = 1024
 
 # 剰余で余った部分は切り捨て
 sample_max =  wavs.size - wavs.size % FRAME_LEN
-puts "----- 解析対象のサイズ最大値(sample_max) -----"
-puts sample_max
-puts "----- 余り -----"
-puts wavs.size - sample_max
 
+# 解析対象のフレーム最大値
 frame_max = sample_max / FRAME_LEN
-puts "----- 解析対象のフレーム最大値(frame_max) -----"
-puts frame_max
 
 # 対象の各フレーム内の音量をリストで取得
 # 512個の要素を含む配列の配列に変形して、最後の配列を除く(切り捨て)それぞれの配列について二条平均平方根を求める
@@ -52,7 +46,7 @@ diff_arr = wavs[0..sample_max]
   .each_slice(2) # フレームのペアを作成
   .to_a # Enumerable -> Array
   .map{|arr|
-    arr[0] - arr[1] >= 0 ? arr[0] - arr[1] : 0 # 隣り合うフレーム同士の差を計算、ただしマイナス値は0とする
+    arr[1] != nil && arr[0] - arr[1] >= 0 ? arr[0] - arr[1] : 0 # 隣り合うフレーム同士の差を計算、ただしマイナス値は0とする
   }
 
 def calc_bpm_match(data, bpm)
@@ -86,8 +80,5 @@ end
 
 # TODO 別のマッチ方法の提案
 res = calc_match(diff_arr)
-puts "----- マッチ度 -----"
-puts "BPM \t\t Match rate"
-res.each_with_index{|e, i| puts "#{i+60} \t #{e}"}
-puts "----- マッチ度最大値のindex + 60 -----"
-puts res.index(res.max) + 60
+puts "BPM\tMatch rate"
+res.each_with_index{|e, i| puts "#{i+60}\t#{e}"}
