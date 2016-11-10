@@ -80,5 +80,5 @@ end
 
 # TODO 別のマッチ方法の提案
 res = calc_match(diff_arr)
-puts "BPM\tMatch rate"
-res.each_with_index{|e, i| puts "#{i+60}\t#{e}"}
+puts "BPM,Match rate"
+res.each_with_index{|e, i| puts "#{i+60},#{e}"}
