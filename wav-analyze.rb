@@ -3,16 +3,10 @@ require 'rubygems'
 require 'wav-file'
 
 # wavファイルopen
-f = open("mudai.wav")
+f = open("jump.wav")
 format = WavFile::readFormat(f)
 data_chunk = WavFile::readDataChunk(f)
 f.close
-
-# 入力したwavファイルのformat出力
-=begin
-puts "----- wavファイルのフォーマット -----"
-puts format
-=end
 
 # サンプリング周期[s]
 t = 1.0/format.hz
@@ -49,24 +43,19 @@ diff_arr = wavs[0..sample_max]
     arr[1] != nil && arr[0] - arr[1] >= 0 ? arr[0] - arr[1] : 0 # 隣り合うフレーム同士の差を計算、ただしマイナス値は0とする
   }
 
+# 渡されたdataとbpmについて、マッチ度の計算を行う
 def calc_bpm_match(data, bpm)
-    n = data.size
     f_bpm   = bpm / 60.0
     s = 44100.0 / FRAME_LEN
 
     # 畳み込みして1/N倍
-    # TODO 汚いのでリファクタリング、畳み込みのみで再現できないか
-    n = 0
-    a_bpm = data.inject(0){|sum, x|
-      n = n + 1
-      sum + x * Math.cos(2 * Math::PI * f_bpm * n / s)
-    } / data.size
+    a_bpm = (0..data.size-1).map{|m|
+      Math.cos(2 * Math::PI * f_bpm * m / s)
+    }.zip(data).map{|x,y| x * y}.inject(:+) / data.size
 
-    n = 0
-    b_bpm = data.inject(0){|sum, x|
-      n = n + 1
-      sum + x * Math.sin(2 * Math::PI * f_bpm * n / s)
-    } / data.size
+    b_bpm = (0..data.size-1).map{|m|
+      Math.sin(2 * Math::PI * f_bpm * m / s)
+    }.zip(data).map{|x,y| x * y}.inject(:+) / data.size
 
     Math.sqrt(a_bpm * a_bpm + b_bpm * b_bpm)
 end
