@@ -36,11 +36,11 @@ frame_max = sample_max / FRAME_LEN
 diff_arr = wavs[0..sample_max]
   .each_slice(FRAME_LEN) # wavファイルをFRAME_LENの集合に分解
   .to_a # Enumerable -> Array
-  .map{|arr| Math.sqrt(arr.inject(0){|sum, x| sum + x * x} / arr.size)} # それぞれのフレームについて、二乗平均平方根を計算
+  .map{|arr| Math.sqrt(arr.map{|elem| elem ** 2}.inject(:+) / arr.size)} # それぞれのフレームについて、二乗平均平方根を計算
   .each_slice(2) # フレームのペアを作成
   .to_a # Enumerable -> Array
-  .map{|arr|
-    arr[1] != nil && arr[0] - arr[1] >= 0 ? arr[0] - arr[1] : 0 # 隣り合うフレーム同士の差を計算、ただしマイナス値は0とする
+  .map{|x,y|
+    y != nil && x - y >= 0 ? x - y : 0 # 隣り合うフレーム同士の差を計算、ただしマイナス値は0とする
   }
 
 # 渡されたdataとbpmについて、マッチ度の計算を行う
@@ -57,7 +57,7 @@ def calc_bpm_match(data, bpm)
       Math.sin(2 * Math::PI * f_bpm * m / s)
     }.zip(data).map{|x,y| x * y}.inject(:+) / data.size
 
-    Math.sqrt(a_bpm * a_bpm + b_bpm * b_bpm)
+    Math.sqrt(a_bpm ** 2 + b_bpm ** 2)
 end
 
 # 60から240までbpmのマッチ度を計算し、マッチ度のリストを返す
