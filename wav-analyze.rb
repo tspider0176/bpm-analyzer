@@ -1,16 +1,14 @@
 ## -*- confing: utf-8 -*-
 require 'rubygems'
 require 'wav-file'
-require 'singleton'
-
-FRAME_LEN = 512
-SAMPLE_F_PER_FRAME = 44100.0 / FRAME_LEN
+require_relative "enumerable"
 
 class BPMAnalyzer
-  include Singleton
+  FRAME_LEN = 512
+  SAMPLE_F_PER_FRAME = 44100.0 / FRAME_LEN
 
-  def initialize
-    f = open("tempo_120.wav")
+  def initialize(file_name)
+    f = open(file_name)
     @format = WavFile::readFormat(f)
     @data_chunk = WavFile::readDataChunk(f)
     @wavs = get_wav_array(@data_chunk, @format)
@@ -22,17 +20,17 @@ class BPMAnalyzer
   end
 
   def get_wav_array(data_chunk, format)
-    data_chunk.data.unpack(bit_per_sample(format)) # chuck -> dataの配列へunpack
+    data_chunk.data.unpack(bit_per_sample(format)) # datachuck -> dataの配列へunpack
   end
 
   def calc_bpm_match(data, bpm)
-      f_bpm   = bpm / 60.0
+      f_bpm = bpm / 60.0
 
       phase_cos = lambda{|m| Math.cos(2 * Math::PI * f_bpm * m / SAMPLE_F_PER_FRAME)}
       phase_sin = lambda{|m| Math.sin(2 * Math::PI * f_bpm * m / SAMPLE_F_PER_FRAME)}
 
-      a_bpm = (0..data.size-1).map{|m| phase_cos.(m)}.zip(data).map{|x,y| x * y}.inject(:+) / data.size
-      b_bpm = (0..data.size-1).map{|m| phase_sin.(m)}.zip(data).map{|x,y| x * y}.inject(:+) / data.size
+      a_bpm = (0..data.size-1).map{|m| phase_cos.(m)}.zip_with(data){|x,y| x * y}.inject(:+) / data.size
+      b_bpm = (0..data.size-1).map{|m| phase_sin.(m)}.zip_with(data){|x,y| x * y}.inject(:+) / data.size
 
       Math.sqrt(a_bpm ** 2 + b_bpm ** 2)
   end
@@ -58,6 +56,6 @@ class BPMAnalyzer
   end
 end
 
-obj = BPMAnalyzer.instance
+obj = BPMAnalyzer.new("tempo_120.wav")
 obj.run
 puts obj.to_s
