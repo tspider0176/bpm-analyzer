@@ -24,7 +24,6 @@ http://sky.geocities.jp/kmaedam/directx9/waveform.html
 
 このサイトの説明によると、RIFF形式通り最初の数バイトはINFO情報を含み、更にその後に続くnバイトでDATA本体を表しているようです。それぞれの情報が取り出せれば解析は出来そう。
 
-
 ## BPM解析手法
 http://hp.vector.co.jp/authors/VA046927/tempo/tempo.html
 理論的にはこのサイトでかなり詳しく説明されているようなのでこの場で込み入った説明はしません。サイトから引用すると、WAVファイルのBPMを求めるまでの手順は、
@@ -156,18 +155,10 @@ Math.sqrt(arr.map{|elem| elem ** 2}.inject(:+) / arr.size)
 これで
 
 ```
-[[フレーム1のRMS値], [フレーム2のRMS値], [フレーム3のRMS値], ..., [フレームnのRMS値]]
+[フレーム1のRMS値, フレーム2のRMS値, フレーム3のRMS値, ..., フレームnのRMS値]
 ```
 
-が手に入りました。要素数1の配列の配列では操作がやり辛いのでさっさとflattenしてしまいましょう。
-
-```rb
-get_wav_array(data_chunk, format).take(@wavs.size - @wavs.size % FRAME_LEN)
-      .each_slice(FRAME_LEN).to_a
-      .map{|arr| Math.sqrt(arr.map{|elem| elem ** 2}.inject(:+) / arr.size)}
-      .flatten
-```
-
+が手に入りました。
 どんどん行きます。次にやるべきことは、
 
 > 隣り合うフレームの音量の増加量を求める。
@@ -178,33 +169,31 @@ get_wav_array(data_chunk, format).take(@wavs.size - @wavs.size % FRAME_LEN)
 [フレーム1と2のRMS値差, フレーム2と3のRMS値差, ..., フレームn-1とnのRMS値差]
 ```
 
-という形に変換すれば良い訳です。ここで、変換前と変換後で要素数が1つ減少している点に注意です。
-
-単純に考えれば、今得られている配列 *array* の2番目の要素からn番目の要素 *array[2-array.length]* を、同じく *array* の1番目の要素からn-1番目の要素について、それぞれの要素同士を引き算して *array* 最後の要素をdropすれば完成です。
-しかしここまでメソッドチェーンを繋げた以上、キリの良いところまで繋げたい…！（関数脳）
-という訳で少し頭をひねって考えました。
+という形に変換すれば良い訳です。ここで、変換前と変換後で配列の要素数が1つ減少している点に注意です。1つ前のstepで手に入った配列を、 *diff_arr* としておきましょう。すると、
 
 ```rb
-get_wav_array(data_chunk, format).take(@wavs.size - @wavs.size % FRAME_LEN)
+diff_arr[0..-2].zip(diff_arr[1..-1]).map{|f,x| f - x}
+```
+
+と書けます。上のプログラムは単純に、今得られている配列 *diff_arr* の1番目の要素からn-1番目の要素から、同じく *diff_arr* の2番目の要素からn番目の要素を引き算しているだけです。
+
+注：Rubyにはvector演算を行うメソッドが存在しないので、Array#zipで二つの配列をまとめ、mapでまとめられた値に対する演算を書く方式が主流のようです。
+\# しかしここまでメソッドチェーンを繋げた以上、キリの良いところまで繋げたかった…！
+
+長々と書きましたが、一旦ここまでをまとめると以下になります。
+
+```rb
+diff_arr = @wavs.take(@wavs.size - @wavs.size % FRAME_LEN)
       .each_slice(FRAME_LEN).to_a
       .map{|arr| Math.sqrt(arr.map{|elem| elem ** 2}.inject(:+) / arr.size)}
-      .flatten
 
+diff_arr[0..-2].zip(diff_arr[1..-1]).map{|f,x| f - x}
 ```
-
-と書くことが出来ます。ここでは具体的に、
-
-```rb
-      .each_slice(2).to_a
-```
-
-とEnumerable#each_sliceメソッドを再度用いて配列をペアごとに区切り、（to_aで配列に変換して）
-
-```rb
-      .map{|x,y| y != nil && x - y >= 0 ? x - y : 0}
-```
-
-
 
 ### 後半
-ここから少し理論的に難しくなっていきます。
+ここから少し理論的に難しくなっていきます。まず
+
+> 増加量の時間変化の周波数成分を求める
+
+だそうです。時間変化の周波数成分と聞くとフーリエ解析が思い浮かびますが、
+取り敢えずは先ほど求めた配列に対して、以下の数式を適用すれば良いです。フーリエ解析の理論の説明は長くなりそうなので割愛。
