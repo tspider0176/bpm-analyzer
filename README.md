@@ -1,60 +1,210 @@
-# アドベントカレンダーのネタ
+この記事は Aizu Advent Calendar 2016 2日目の記事です。
 
-曲のBPM、調を解析するプログラム前から作りたかったからこの際作ってしまうかと思って考えてみた。
-作りたいから作るだけ。
+前の人は、@hnjkさん、次の人は @misoton665 さんです。
 
-## 1. BPM特定（大前提）
-#### 理論
-以下のサイトが詳しい、実装はすぐできそう  
-（理論を比較的詳しく説明している、このサイトではC/C++で実装している）  
-http://hp.vector.co.jp/authors/VA046927/tempo/tempo.html  
-（理論が簡単に説明されている、ここでは実装なし）  
-http://ackiesound.ifdef.jp/doc/tempo/main.html  
-（このサイトではpythonを使って実装してる）  
-http://ism1000ch.hatenablog.com/entry/2014/07/08/164124  
+## はじめに
+この記事では汎用的な音楽ファイル形式であるWAVファイルについて、BPM解析を行うプログラムを作成します。
+今回は手軽に書けるのと、最近あまり注力して書いてないのでリハビリ、という名目でRubyを使って書きました。
 
-#### 新規性
-理論についてはこれらのサイトで説明され尽くされているので特に面白味のない車輪の再発明、
-ここで止めると大して面白くない
+## Wavファイル形式について
+BPMを解析するプログラムだとかアルゴリズムだとかを調べる前に、まず今回解析の対象とするWAVファイルの形式について、基礎知識から調べました。
 
-## 2. 調特定（出来ればここまでやりたい）
-#### 理論
-（まずwavにスペクトル解析を適用してどのタイミングでどの周波数の音がなっているのかを知る必要がある、以下はJavaで実装している）
-http://krr.blog.shinobi.jp/javafx_praxis/java%E3%81%A7%E5%91%A8%E6%B3%A2%E6%95%B0%E5%88%86%E6%9E%90%E3%82%92%E3%81%97%E3%81%A6%E3%81%BF%E3%82%8B#Q2Qj1DI.twitter_tweet_ninja_m
-フーリエ変換をするだけ、と書いてあるが…
+> WAVまたはWAVE（ウェーブ、ウェブ） (RIFF waveform Audio Format) は、マイクロソフトとIBMにより開発された音声データ記述のためのフォーマットである。RIFFの一種。主としてWindowsで使われるファイル形式である。ファイルに格納した場合の拡張子は、.wav。
+WAV - Wikipedia, https://ja.wikipedia.org/wiki/WAV
 
-（このサイトではpythonの曲解析ライブラリのmusci21を使って調を割り出している、プログラムを辿れば理論は導けそう）
-http://d.hatena.ne.jp/naraba/20121201/p1
-（このサイトではメジャーかマイナーかどっちかまでを特定する工程を書いてくれてる）
-http://guitarex.web.fc2.com/knowledge/key_signature.html
-（ニューラルネットワークを使って調を割り出す過程を示したサイト、下の論文を参考にしているようだ）
-http://qiita.com/TomokIshii/items/d1a2f49ac70b31b8806f
-（論文、ニューラルネットワークを使って曲の調を割り出そうとしている）
-http://www.bcp.psych.ualberta.ca/research/pdfstuff/Yaremchuk3.pdf
-ここまで調べて思ったけど今回は教師を大量に用意してる暇が無いので教師あり学習は出来ない。
-現存のツールを使えば一応セットは用意できるだろうけど、それも精度が問題に挙げられてるし教師があってる可能性もなかなか低い
-教師無し学習なら出来るだろうけど精度が怖い、その精度を修正する理論を突き詰めてくと記事じゃなくて卒論が書ける
-複数のジャンルの曲を用意してこれはあってたーこれは間違えてたーで終わらせるか？
+ここでRIFFとは？と思いさらに調べると
 
-#### 新規性
-上のpythonライブラリ、マークアップ言語で書かれたファイルに対応してるけど音楽ファイルには対応していない。（一応MIDIファイルには対応してる模様）
-そのおかげで調の解析が楽に出来て精度が期待されてるんだろうけども、出来れば音楽形式のファイルそのものの解析もして欲しい。
-レコボとか著名なソフトではデフォで備わってる機能だし、実装不可能では無いはず…
-問題は精度になりそう
+> Resource Interchange File Format（RIFF、「資源交換用ファイル形式」の意味）は、タグ付きのデータを格納するための汎用メタファイル形式である。
+Resource Interchange File Format - Wikipedia, https://ja.wikipedia.org/wiki/Resource_Interchange_File_Format
 
-## 3. 転調箇所と転調先の特定（時間が余って暇だったら）
-#### 理論（適当）
-拍子が割り出せてるので拍子毎に調を割り出して、どのタイミングで調が切り替わったかを判別する
-クラブ音楽限定の話になってしまうけどクラブ音楽はだいたい8の倍数で展開する（8の倍数と行きたいところだけどジャンルによってはまちまち）ので
-8小節分、それまでとは違う調が続いたら転調したとみなすとか
-曲の一覧を画面に一気に表示してパート毎に可能性の高い調を表示するとか
-音が特定されてても調の特定が難しい（Dominoとかあれすごい事になる）のもあるかもしれない…結構無謀かもしれない
+とのこと。Wikiの内容を簡単にまとめると、RIFFに基づいているファイルは小さなチャンクから構成されており、それぞれINFOチャンク、DATAチャンクなどから構成されている模様。つまりRIFFの一種であるWAVファイルも同じようなチャンクから成る構成をしているということ。  
+では具体的にそのチャンクの内容とはどうなっているんでしょうか。WAV形式の構成について調べてみたところ、以下のようなサイトを見つけました。
 
-#### 新規性
-ググったけどパッと見て見付からなかった。  
-セトリ無しのDJプレイで次の曲に迷ったら取り敢えず同じ調の曲から選んでつなぐようにしてるんだけども
-あのレコボのキー表示、一個しかないって事は可能性の高い調を表示してるだけだよね…？  
-流してる曲の途中とかで「ヤベェ！今明らかに転調した！でも何の調に転調したかワカンねぇ！」って自体は避けられるかと。  
-別に曲の調に拘らなくてもフロアの空気とか今流してる曲調とか次の曲選びにもっと大事な点はあるんだけども。
-あとアウトロで元の調に戻ったりするから別に深く考えなくても良いんだけども。
-奇抜な調に転調しない限り元の調とも調和が取れてたりする調だったりして考えなくても良い気がするんだけども。
+http://sky.geocities.jp/kmaedam/directx9/waveform.html
+
+このサイトの説明によると、RIFF形式通り最初の数バイトはINFO情報を含み、更にその後に続くnバイトでDATA本体を表しているようです。それぞれの情報が取り出せれば解析は出来そう。
+
+
+## BPM解析手法
+http://hp.vector.co.jp/authors/VA046927/tempo/tempo.html
+理論的にはこのサイトでかなり詳しく説明されているようなのでこの場で込み入った説明はしません。サイトから引用すると、WAVファイルのBPMを求めるまでの手順は、
+
+* WAVファイルを一定時間(以下フレーム)ごとに区切る。
+* フレームごとの音量を求める。
+* 隣り合うフレームの音量の増加量を求める。
+* 増加量の時間変化の周波数成分を求める。
+* 周波数成分のピークを検出する。
+* ピークの周波数からテンポを計算する。
+
+となるそうです。なるほど。
+上の処理は大きく分けて前半と後半に分けることが出来そうです。具体的には、WAVファイルに対して計測を行う
+
+> WAVファイルを一定時間(以下フレーム)ごとに区切る。
+> フレームごとの音量を求める。
+> 隣り合うフレームの音量の増加量を求める。
+
+このパートと、実際に計測によって得られた結果から
+
+> 増加量の時間変化の周波数成分を求める。
+> 周波数成分のピークを検出する。
+> ピークの周波数からテンポを計算する。
+
+以上の項目を導出して行くパートです。
+実際に次の実装の節では二つに分けて実装して行きます。
+
+## 実装
+### 前半
+では実際に上で挙げたBPM解析の手法に基づいてプログラムを書いて行きましょう。一からWAVを解析するようなプログラムを書いている程時間がなかったので、Wavファイルを扱える[wav-file](http://shokai.org/blog/archives/5408)と言うgemを使用。早速導入。
+
+```
+gem install wav-file
+```
+
+このライブラリでは、WAV形式のINFOチャンク部分とDATAチャンク部分を分けて出力出来るようだったので、[適当な曲](https://soundcloud.com/tom-jonkers-1/syrin-nuwa-take-her-heart-free-release)を拾って来て実行してみました。
+
+```rb
+require 'wav-file'
+
+f = open("./Take-Her-Heart.wav")
+format = WavFile::readFormat(f)
+f.close
+
+puts format
+```
+これだけでWAVファイルのINFOチャンクから情報を読み取り、出力してくれるそう。実際に実行してみると、
+
+<img width="322" alt="スクリーンショット 2016-12-03 10.22.50.png" src="https://qiita-image-store.s3.amazonaws.com/0/146476/2577b57a-62d4-6e5b-8a9f-e581df6fd8ea.png">
+
+ちゃんと出力されました。すごい簡単。
+動作が確認できた所で、実際に手法を実装して行ってみます。まず最初は、
+
+> wavファイルを一定時間(以下フレーム)ごとに区切る。
+
+との事でした。[wav-fileを開発している方のブログ記事](http://shokai.org/blog/archives/5408)によると、WAVファイルのDATAチャンクバイナリから、WAVの波形を配列 *wavs* として取得するには、
+
+```rb
+f = open("input.wav")
+format = WavFile::readFormat(f)
+dataChunk = WavFile::readDataChunk(f)
+f.close
+
+dataChunk = WavFile::readDataChunk(f)
+bit = 's*' if format.bitPerSample == 16 # int16_t
+bit = 'c*' if format.bitPerSample == 8 # signed char
+wavs = dataChunk.data.unpack(bit) # read binary
+```
+
+と書くそうなので、DATAチャンクを一定フレーム数（ここでは1024にしています）に区切るプログラムは以下のように書けるはずです。
+
+```rb
+FRAME_LEN = 1024
+
+def bit_per_sample(format)
+  # ここでは16bitか8bitしか対象にして居ないので三項演算子で表現
+  format.bitPerSample == 16 ? 's*' : 'c*'
+end
+
+def get_wav_array(data_chunk, format)
+  data_chunk.data.unpack(bit_per_sample(format))
+end
+
+f = open("./tempo_120.wav") # BPM120のメトロノーム音が入ったWAVファイル
+data_chunk = WavFile::readDataChunk(f)
+format = WavFile::readFormat(f)
+f.close()
+
+get_wav_array(data_chunk, format)
+      .take(@wavs.size - @wavs.size % FRAME_LEN)
+      .each_slice(FRAME_LEN).to_a
+```
+
+ここでは、Array#takeメソッドを使いフレーム数に満たない余ったサンプル切り捨て、
+Enumerable#each_sliceとto_aメソッドでフレーム毎の配列の配列へと変換しています。
+
+注：Enumerable#each_sliceメソッドは便利なメソッドだけど、Arrayの高階関数として呼び出す事が出来ても戻り値の型がEnumerable型なので、メソッドチェーンを繋げていく場合はいちいちto_aしないとダメで結構面倒。どうにかならないかな。
+
+次に行きましょう。
+
+> フレームごとの音量を求める。
+
+今までに書いたコードより、サンプルをフレーム毎に区切った配列
+
+```
+[[フレーム1], [フレーム2], [フレーム3], ..., [フレームn]]
+```
+
+が手に入っている状況ですので、ここでそれぞれのフレームに対して、そのフレーム内の二乗平均平方根（Root Mean Square, RMS）を計算する事でフレームごとの音量を求めたいと思います。注：二乗平均平方根についての説明は[コチラ](https://ja.wikipedia.org/wiki/%E4%BA%8C%E4%B9%97%E5%B9%B3%E5%9D%87%E5%B9%B3%E6%96%B9%E6%A0%B9)。
+先ほどの *get_wav_array(data_chunk, format)* に続けて、
+
+```rb
+get_wav_array(data_chunk, format).take(@wavs.size - @wavs.size % FRAME_LEN)
+      .each_slice(FRAME_LEN).to_a
+      .map{|arr| Math.sqrt(arr.map{|elem| elem ** 2}.inject(:+) / arr.size)}
+```
+
+と書く事が出来るでしょう。Array#mapの中身の
+
+```rb
+Math.sqrt(arr.map{|elem| elem ** 2}.inject(:+) / arr.size)
+```
+
+この部分が、
+
+![](https://wikimedia.org/api/rest_v1/media/math/render/svg/f47488d55c3628bf8711cc9fa5a0b0e920a93ece)
+
+この数式の右辺と対応しています。
+これで
+
+```
+[[フレーム1のRMS値], [フレーム2のRMS値], [フレーム3のRMS値], ..., [フレームnのRMS値]]
+```
+
+が手に入りました。要素数1の配列の配列では操作がやり辛いのでさっさとflattenしてしまいましょう。
+
+```rb
+get_wav_array(data_chunk, format).take(@wavs.size - @wavs.size % FRAME_LEN)
+      .each_slice(FRAME_LEN).to_a
+      .map{|arr| Math.sqrt(arr.map{|elem| elem ** 2}.inject(:+) / arr.size)}
+      .flatten
+```
+
+どんどん行きます。次にやるべきことは、
+
+> 隣り合うフレームの音量の増加量を求める。
+
+とのことでした。つまり、先ほどの配列を、
+
+```
+[フレーム1と2のRMS値差, フレーム2と3のRMS値差, ..., フレームn-1とnのRMS値差]
+```
+
+という形に変換すれば良い訳です。ここで、変換前と変換後で要素数が1つ減少している点に注意です。
+
+単純に考えれば、今得られている配列 *array* の2番目の要素からn番目の要素 *array[2-array.length]* を、同じく *array* の1番目の要素からn-1番目の要素について、それぞれの要素同士を引き算して *array* 最後の要素をdropすれば完成です。
+しかしここまでメソッドチェーンを繋げた以上、キリの良いところまで繋げたい…！（関数脳）
+という訳で少し頭をひねって考えました。
+
+```rb
+get_wav_array(data_chunk, format).take(@wavs.size - @wavs.size % FRAME_LEN)
+      .each_slice(FRAME_LEN).to_a
+      .map{|arr| Math.sqrt(arr.map{|elem| elem ** 2}.inject(:+) / arr.size)}
+      .flatten
+
+```
+
+と書くことが出来ます。ここでは具体的に、
+
+```rb
+      .each_slice(2).to_a
+```
+
+とEnumerable#each_sliceメソッドを再度用いて配列をペアごとに区切り、（to_aで配列に変換して）
+
+```rb
+      .map{|x,y| y != nil && x - y >= 0 ? x - y : 0}
+```
+
+
+
+### 後半
+ここから少し理論的に難しくなっていきます。
