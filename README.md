@@ -1,10 +1,18 @@
-この記事は Aizu Advent Calendar 2016 2日目の記事です。
+この記事は [Aizu Advent Calendar 2016](http://qiita.com/advent-calendar/2016/aizu) 4日目の記事です。
 
 前の人は、@hnjkさん、次の人は @misoton665 さんです。
 
 ## はじめに
 この記事では汎用的な音楽ファイル形式であるWAVファイルについて、BPM解析を行うプログラムを作成します。
-今回は手軽に書けるのと、最近あまり注力して書いてないのでリハビリ、という名目でRubyを使って書きました。
+今回は手軽に書けるのと、最近あまり注力して書いてないのでリハビリという名目で、Rubyを使って書きました。
+
+```
+$ ruby -v
+-> ruby 2.2.3p173
+```
+
+プログラムを作成して行く思考過程に重点を置いて記事を書いたら、結構な文量になってしまいました…。アッこの人こういう思考経路でプログラムを書いていくんだなーと思っていただければ幸いです。
+作成したプログラムへの指摘は大歓迎です。
 
 ## Wavファイル形式について
 BPMを解析するプログラムだとかアルゴリズムだとかを調べる前に、まず今回解析の対象とするWAVファイルの形式について、基礎知識から調べました。
@@ -195,5 +203,216 @@ diff_arr[0..-2].zip(diff_arr[1..-1]).map{|f,x| f - x}
 
 > 増加量の時間変化の周波数成分を求める
 
-だそうです。時間変化の周波数成分と聞くとフーリエ解析が思い浮かびますが、
-取り敢えずは先ほど求めた配列に対して、以下の数式を適用すれば良いです。フーリエ解析の理論の説明は長くなりそうなので割愛。
+だそうです。サイトによると、n番目のフレームの音量の増加量をD(n)、フレームのサンプリング周波数をsとすると、各BPMのマッチ度Rbpmは以下で表されるとのこと。
+<img width="262" alt="スクリーンショット 2016-12-03 12.08.27.png" src="https://qiita-image-store.s3.amazonaws.com/0/146476/efd77b3b-4ba6-316b-a849-94d5fbee8bb7.png">
+
+この数式をRubyに落とし込みましょう。
+まず最初に今回対象としているBPMの幅は60~240なので、BPMをキーとして、値がそのBPMのマッチ度となるようなハッシュを作成しておく。
+
+```rb
+(60..240).inject({}){|acc, bpm|
+      acc[bpm] = calc_bpm_match(data, bpm)
+      acc
+}
+```
+
+ハッシュを作成する過程で呼び出されているcalc_bpm_match関数は、渡されたbpmとdata（前半で取得したフレーム毎のRMS差配列）のマッチ度を求める関数です。
+以下で順番に書いて行ってみましょう。
+
+まず最初に、
+<img width="192" alt="スクリーンショット 2016-12-03 12.21.19.png" src="https://qiita-image-store.s3.amazonaws.com/0/146476/1ade7627-15eb-3884-d5f4-4f69b5f4333c.png">
+こちらに注目。
+これは簡単で、Ruby上では以下のように表すことができるでしょう。
+
+```rb
+Math.sqrt(a_bpm ** 2 + b_bpm ** 2)
+```
+
+では、次に *a_bpm* と *b_bpm* について考えてみましょう。
+数式は、
+
+
+となっていますが、大きな差異は無く、cosとsinのみが違っている定義になっています。
+ここで、cosとsinの偏角部分の数式が少々複雑になっているので、 *a_bpm* と *b_bpm* を定義する前に、三角関数用のlambda式を定義しておくことにしましょう。
+
+```rb
+phase_cos = lambda{|m| Math.cos(2 * Math::PI * f_bpm * m / SAMPLE_F_PER_FRAME)}
+phase_sin = lambda{|m| Math.sin(2 * Math::PI * f_bpm * m / SAMPLE_F_PER_FRAME)}
+```
+
+これらはそれぞれ必要な時に *.apply(m)* も若くは *.(m)* によって呼び出して利用することにします。
+さて、それでは *a_bpm* と *b_bpm* の定義に移りましょう。Ruby上の数式に直すと以下のようになると考えられます。
+
+```rb
+a_bpm = (0..data.size-1)
+      .map{|m| phase_cos.(m)}
+      .zip(data)
+      .map{|x,y| x * y}
+      .inject(:+) / data.size
+
+a_bpm = (0..data.size-1)
+      .map{|m| phase_sin.(m)}
+      .zip(data)
+      .map{|x,y| x * y}
+      .inject(:+) / data.size
+```
+ここで、先ほども出たように、ベクトル同士の乗算が出てきますが、ここでもベクトル同士の演算を行う際にはzipしてmapして演算しています。しかしこれを書くのが二回目となると流石に気になってきましたので、呟いてみると…
+
+なんとzipWithをRubyで実装している方がいらっしゃいました。
+記事内容によると、Enumerableモジュールに自前のメソッドを追加する事で実現しているようです。
+
+```
+module Enumerable
+  def zip_with(*others, &block)
+    zip(*others).map &block
+  end
+end
+```
+
+ここで定義したzip_withを利用すると、上で定義した *a_bpm* と *b_bpm* は、以下のように書き換えられます。
+注：追加した後にrequire_relative "enumerable"を忘れないように！！！
+
+```rb
+a_bpm = (0..data.size-1)
+      .map{|m| phase_cos.(m)}
+      .zip_with(data){|x,y| x * y}
+      .inject(:+) / data.size
+
+b_bpm = (0..data.size-1)
+      .map{|m| phase_sin.(m)}
+      .zip_with(data){|x,y| x * y}
+      .inject(:+) / data.size
+```
+
+大してコード量が少なくなったわけでもないですが、個人的に可読性も上がって満足。
+以上を全て組み合わせ、最終的なcalc_bpm_match関数は以下のようになります。
+
+```rb
+def calc_bpm_match(data, bpm)
+      f_bpm = bpm / 60.0
+
+      phase_cos = lambda{|m| Math.cos(2 * Math::PI * f_bpm * m / SAMPLE_F_PER_FRAME)}
+      phase_sin = lambda{|m| Math.sin(2 * Math::PI * f_bpm * m / SAMPLE_F_PER_FRAME)}
+
+      a_bpm = (0..data.size-1)
+        .map{|m| phase_cos.(m)}
+        .zip_with(data){|x,y| x * y}
+        .inject(:+) / data.size
+
+      b_bpm = (0..data.size-1)
+        .map{|m| phase_sin.(m)}
+        .zip_with(data){|x,y| x * y}
+        .inject(:+) / data.size
+
+      Math.sqrt(a_bpm ** 2 + b_bpm ** 2)
+end
+```
+
+コード量が増え、結構まとまりが無い雰囲気が漂って来たので、次のステップに移る前にclassにまとめてしまいます。
+
+```rb
+class BPMAnalyzer
+  FRAME_LEN = 512
+  SAMPLE_F_PER_FRAME = 44100.0 / FRAME_LEN
+
+  def initialize(file_name)
+    f = open(file_name)
+    @format = WavFile::readFormat(f)
+    @data_chunk = WavFile::readDataChunk(f)
+    @wavs = get_wav_array(@data_chunk, @format)
+    f.close
+    @res = nil
+  end
+
+  def run
+    diff_arr = @wavs.take(@wavs.size - @wavs.size % FRAME_LEN)
+      .each_slice(FRAME_LEN).to_a
+      .map{|arr| Math.sqrt(arr.map{|elem| elem ** 2}.inject(:+) / arr.size)}
+
+    diff_arr[0..-2].zip(diff_arr[1..-1]).map{|f,x| f - x}
+
+    @res = calc_match(diff_arr)
+  end
+
+  def to_s
+    "BPM,Match rate\n" + @res.map{|k, v| "#{k},#{v}"}.join("\n") if @res != nil
+  end
+
+private
+  def bit_per_sample(format)
+    format.bitPerSample == 16 ? 's*' : 'c*'
+  end
+
+  def get_wav_array(data_chunk, format)
+    data_chunk.data.unpack(bit_per_sample(format))
+  end
+
+  def calc_bpm_match(data, bpm)
+      f_bpm = bpm / 60.0
+
+      phase_cos = lambda{|m| Math.cos(2 * Math::PI * f_bpm * m / SAMPLE_F_PER_FRAME)}
+      phase_sin = lambda{|m| Math.sin(2 * Math::PI * f_bpm * m / SAMPLE_F_PER_FRAME)}
+
+      a_bpm = (0..data.size-1).map{|m| phase_cos.(m)}.zip_with(data){|x,y| x * y}.inject(:+) / data.size
+      b_bpm = (0..data.size-1).map{|m| phase_sin.(m)}.zip_with(data){|x,y| x * y}.inject(:+) / data.size
+
+      Math.sqrt(a_bpm ** 2 + b_bpm ** 2)
+  end
+
+  def calc_match(data)
+      (60..240).inject({}){|acc, bpm|
+        acc[bpm] = calc_bpm_match(data, bpm)
+        acc
+      }
+  end
+end
+```
+
+さて、オブジェクトの形に直したところで次のSTEPに移りましょう。
+
+> 周波数成分のピークを検出する。
+> ピークの周波数からテンポを計算する。
+
+この項目は内容がほぼほぼ被っているので一気にやってしまいましょう。先ほど作成した60から240までのBPMと、そのマッチ度を利用してピークを検出します。コードは以下のように書きました。
+
+```rb
+# add public method to BPMAnalyzer class
+def get_wav_array(data_chunk, format)
+    data_chunk.data.unpack(bit_per_sample(format))
+end
+```
+
+```rb
+analyzer = BPMAnalyzer.new(ARGV[0])
+analyzer.run
+puts analyzer.get_max_rate
+```
+
+この時点での出力は、
+<img width="466" alt="スクリーンショット 2016-12-03 15.35.49.png" src="https://qiita-image-store.s3.amazonaws.com/0/146476/182b2f01-d664-b15e-1bcf-4ac0b41d5975.png">
+となりました。どうやら正しくBPMが検出されているようです。
+
+試しに幾つかの曲を解析してみます。
+
+* うるさい曲
+Malice - Fu#kin die (BPM 155)
+<iframe width="100%" height="450" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/291015339&amp;auto_play=false&amp;hide_related=false&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true"></iframe>
+
+<img width="696" alt="スクリーンショット 2016-12-03 16.12.03.png" src="https://qiita-image-store.s3.amazonaws.com/0/146476/2b93a222-5040-a8dc-ecbe-9ede52d49a27.png">
+
+成功。音圧の違いで検出がしやすいのかと考え、静かめの曲で再実行
+
+* 静かめの曲
+Stringamp - Winter Morning (BPM 100)
+<iframe width="100%" height="450" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/295938921&amp;auto_play=false&amp;hide_related=false&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true"></iframe>
+
+<img width="456" alt="スクリーンショット 2016-12-03 15.55.31.png" src="https://qiita-image-store.s3.amazonaws.com/0/146476/0b4a65c7-a740-131d-f28e-7461e7e79b0e.png">
+
+大人しめの、激しい音圧の上下が無い曲でも無事正しく検出できました。
+
+## まとめ
+BPM検出プログラムをRubyで、なるべく手続き的にならないように書いた。
+プログラムにもまだまだ改善の余地がありそうなのと、今回の結果を利用してBPMが変わる曲とかも判別できたら面白いかな、と思った。正直理論は全く思い浮かばない。
+PioneerのDJ機材とか見てると、最近の機材は曲の調の割り出し機能とかあったりして…今回の実装が何か取っ掛かりになれば良いかなぁと考えてます。
+
+AIZU ADVENT CALENDAR 2016 明日は @misoton665 さんです。よろしくお願いします。

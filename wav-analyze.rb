@@ -26,12 +26,12 @@ class BPMAnalyzer
     @res = calc_match(diff_arr)
   end
 
-  def to_s
-    "BPM,Match rate\n" + @res.map{|k, v| "#{k},#{v}"}.join("\n") if @res != nil
-  end
-
   def get_max_rate
     "BPM,Match rate\n" + @res.max{|k, v| k[1] <=> v[1]}.join(",") if @res != nil
+  end
+
+  def to_s
+    "BPM,Match rate\n" + @res.map{|k, v| "#{k},#{v}"}.join("\n") if @res != nil
   end
 
 private
@@ -63,7 +63,6 @@ private
   end
 end
 
-obj = BPMAnalyzer.new(ARGV[0])
-obj.run
-puts obj.to_s
-puts obj.get_max_rate
+analyzer = BPMAnalyzer.new(ARGV[0])
+analyzer.run
+puts analyzer.get_max_rate
